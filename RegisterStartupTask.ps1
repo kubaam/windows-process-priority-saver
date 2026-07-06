@@ -1,51 +1,66 @@
 # RegisterStartupTask.ps1
-# Helper script to register/unregister the Process Priority Saver as a Windows Scheduled Task.
+# Registers/unregisters the Process Priority Saver for autostart using the Windows Startup folder (requires no Admin rights).
 
 param (
     [switch]$Uninstall
 )
 
 $ErrorActionPreference = "Stop"
-$TaskName = "ProcessPrioritySaver"
 
-# Tasks can be registered for the current user without Administrator privileges.
+# Get user's Startup folder path
+$StartupFolder = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Startup)
+$VbsPath = Join-Path $StartupFolder "ProcessPrioritySaver.vbs"
+$ScriptPath = Join-Path $PSScriptRoot "ProcessPrioritySaver.ps1"
+
+# Helper to stop running daemon processes
+function Stop-Daemon {
+    Write-Output "Stopping any running ProcessPrioritySaver instances..."
+    $Processes = Get-Process -Name powershell -ErrorAction SilentlyContinue | Where-Object {
+        try {
+            $_.CommandLine -like "*ProcessPrioritySaver.ps1*"
+        } catch {
+            $false
+        }
+    }
+    if ($Processes) {
+        $Processes | Stop-Process -Force
+        Write-Output "Stopped $($Processes.Count) process(es)."
+    } else {
+        Write-Output "No running instances found."
+    }
+}
 
 if ($Uninstall) {
-    Write-Output "Uninstalling scheduled task '$TaskName'..."
-    if (Get-ScheduledTask -TaskPath "\" -TaskName $TaskName -ErrorAction SilentlyContinue) {
-        Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
-        Write-Output "Successfully unregistered '$TaskName'."
+    Write-Output "Uninstalling autostart shortcut..."
+    if (Test-Path $VbsPath) {
+        Remove-Item $VbsPath -Force
+        Write-Output "Removed Vbs launch script from Startup folder."
     } else {
-        Write-Output "Task '$TaskName' is not registered."
+        Write-Output "No startup script found."
     }
+    Stop-Daemon
     exit
 }
 
-# Register the task
-$ScriptPath = Join-Path $PSScriptRoot "ProcessPrioritySaver.ps1"
+# Ensure main script exists
 if (-not (Test-Path $ScriptPath)) {
     Write-Error "Could not find ProcessPrioritySaver.ps1 at $ScriptPath"
     exit
 }
 
-Write-Output "Registering scheduled task '$TaskName' to run at logon..."
+# Stop any currently running instances before registering/restarting
+Stop-Daemon
 
-# Action: Run powershell silently
-$Action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$ScriptPath`""
+Write-Output "Creating silent VBScript launcher in Startup folder..."
+$VbsContent = @"
+Set WshShell = CreateObject("WScript.Shell")
+WshShell.Run "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File ""$ScriptPath""", 0, false
+"@
 
-# Trigger: At logon of the current user
-$Trigger = New-ScheduledTaskTrigger -AtLogOn
+[System.IO.File]::WriteAllText($VbsPath, $VbsContent)
+Write-Output "Successfully registered autostart at: $VbsPath"
 
-# Settings: Allow on battery, don't stop after 3 days
-$Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
-# Set ExecutionTimeLimit to $null (disabled) to prevent task from stopping after 72 hours
-$Settings.ExecutionTimeLimit = $null
-
-# Register
-Register-ScheduledTask -TaskName $TaskName -Trigger $Trigger -Action $Action -Settings $Settings -Force
-
-# Start task immediately
-Start-ScheduledTask -TaskName $TaskName
-
-Write-Output "Successfully registered and started '$TaskName'."
-Write-Output "The script is now running in the background and will start automatically at login."
+# Run it immediately
+Write-Output "Starting Process Priority Saver in the background..."
+Start-Process wscript.exe -ArgumentList "`"$VbsPath`""
+Write-Output "Successfully started. It is now running silently in the background."
