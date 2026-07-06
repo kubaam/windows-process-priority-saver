@@ -1,5 +1,25 @@
 {
     "obs64": "AboveNormal",
     "Streamlabs Desktop": "AboveNormal",
-    "TikTok Live Studio": "AboveNormal"
+    "TikTok Live Studio": "AboveNormal",
+    "discord": "AboveNormal",
+    "steam": "BelowNormal",
+    "EpicGamesLauncher": "BelowNormal",
+    "GalaxyClient": "BelowNormal",
+    "Origin": "BelowNormal",
+    "EADesktop": "BelowNormal",
+    "Battle.net": "BelowNormal",
+    "cs2": "High",
+    "valorant-win64-shipping": "High",
+    "League of Legends": "High",
+    "GTA5": "High",
+    "FortniteClient-Win64-Shipping": "High",
+    "javaw": "High",
+    "dota2": "High",
+    "RustClient": "High",
+    "Overwatch": "High",
+    "RainbowSix": "High",
+    "r5apex": "High",
+    "Cyberpunk2077": "High",
+    "cod": "High"
 }
