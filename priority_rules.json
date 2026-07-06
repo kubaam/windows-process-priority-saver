@@ -21,5 +21,12 @@
     "RainbowSix": "High",
     "r5apex": "High",
     "Cyberpunk2077": "High",
-    "cod": "High"
+    "cod": "High",
+    "Razer Central": "BelowNormal",
+    "Razer.InGameOverlay": "BelowNormal",
+    "Razer.VideoRecorder": "BelowNormal",
+    "razer_elevation_service": "BelowNormal",
+    "RazerAppEngine": "BelowNormal",
+    "RazerCentralService": "BelowNormal",
+    "RazerCortex": "BelowNormal"
 }
