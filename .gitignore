@@ -1,0 +1,11 @@
+# Local configuration
+priority_rules.json
+
+# Logs
+*.log
+chrome_err.log
+chrome_out.log
+
+# Temporary / OS files
+.DS_Store
+Thumbs.db
