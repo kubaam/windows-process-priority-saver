@@ -8,24 +8,7 @@ param (
 $ErrorActionPreference = "Stop"
 $TaskName = "ProcessPrioritySaver"
 
-# Check if running as Administrator
-$Identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-$Principal = New-Object Security.Principal.WindowsPrincipal($Identity)
-$IsAdmin = $Principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-
-if (-not $IsAdmin) {
-    Write-Output "This script requires Administrator privileges. Requesting elevation..."
-    try {
-        $Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`""
-        if ($Uninstall) {
-            $Arguments += " -Uninstall"
-        }
-        Start-Process powershell.exe -ArgumentList $Arguments -Verb RunAs -Wait
-    } catch {
-        Write-Error "Failed to elevate process: $_"
-    }
-    exit
-}
+# Tasks can be registered for the current user without Administrator privileges.
 
 if ($Uninstall) {
     Write-Output "Uninstalling scheduled task '$TaskName'..."
