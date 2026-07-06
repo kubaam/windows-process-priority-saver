@@ -16,24 +16,22 @@ Windows Task Manager does not natively persist process priority classes across r
 
 To register the script to run automatically at user logon:
 
-1. Open a PowerShell console in this directory.
-2. Run the registration script:
-   ```powershell
-   .\RegisterStartupTask.ps1
-   ```
-3. The background daemon is now running and will automatically start on future logins.
+- Simply double-click **`Install.bat`** (or run it in a terminal).
+- Alternatively, run `.\RegisterStartupTask.ps1` in PowerShell.
+
+The background daemon will start immediately and automatically run on future logins.
 
 ## How to Uninstall
 
 To stop the background monitoring and remove the startup link:
 
-1. Run the registration script with the `-Uninstall` flag:
-   ```powershell
-   .\RegisterStartupTask.ps1 -Uninstall
-   ```
+- Simply double-click **`Uninstall.bat`** (or run it in a terminal).
+- Alternatively, run `.\RegisterStartupTask.ps1 -Uninstall` in PowerShell.
 
 ## Files
 
+- `Install.bat`: Double-click to install/register autostart.
+- `Uninstall.bat`: Double-click to uninstall/stop the daemon.
 - `ProcessPrioritySaver.ps1`: The main background daemon script.
 - `RegisterStartupTask.ps1`: Helper script to register/unregister the startup link.
 - `priority_rules.json`: Local database file storing process name -> priority mapping.
