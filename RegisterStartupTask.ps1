@@ -38,8 +38,8 @@ $Trigger = New-ScheduledTaskTrigger -AtLogOn
 
 # Settings: Allow on battery, don't stop after 3 days
 $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
-# Set ExecutionTimeLimit to 0 (disabled) to prevent task from stopping after 72 hours
-$Settings.ExecutionTimeLimit = [System.TimeSpan]::Zero
+# Set ExecutionTimeLimit to $null (disabled) to prevent task from stopping after 72 hours
+$Settings.ExecutionTimeLimit = $null
 
 # Register
 Register-ScheduledTask -TaskName $TaskName -Trigger $Trigger -Action $Action -Settings $Settings -Force
