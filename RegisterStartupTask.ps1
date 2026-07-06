@@ -1,16 +1,25 @@
 # RegisterStartupTask.ps1
-# Registers/unregisters the Process Priority Saver for autostart using the Windows Startup folder (requires no Admin rights).
+# Registers/unregisters the Process Priority Saver.
+# Dual-mode:
+# - Run as Admin: Registers via Windows Task Scheduler with Highest Privileges (can manage elevated games & Razer apps).
+# - Run as User: Registers via Startup folder with silent VBScript (can only manage user-level processes).
 
 param (
     [switch]$Uninstall
 )
 
 $ErrorActionPreference = "Stop"
+$TaskName = "ProcessPrioritySaver"
 
-# Get user's Startup folder path
+# Get paths
 $StartupFolder = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Startup)
 $VbsPath = Join-Path $StartupFolder "ProcessPrioritySaver.vbs"
 $ScriptPath = Join-Path $PSScriptRoot "ProcessPrioritySaver.ps1"
+
+# Check if running as Administrator
+$Identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$Principal = New-Object Security.Principal.WindowsPrincipal($Identity)
+$IsAdmin = $Principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
 # Helper to stop running daemon processes
 function Stop-Daemon {
@@ -31,13 +40,30 @@ function Stop-Daemon {
 }
 
 if ($Uninstall) {
-    Write-Output "Uninstalling autostart shortcut..."
+    Write-Output "Uninstalling autostart registrations..."
+    
+    # 1. Remove VBS startup script
     if (Test-Path $VbsPath) {
         Remove-Item $VbsPath -Force
-        Write-Output "Removed Vbs launch script from Startup folder."
-    } else {
-        Write-Output "No startup script found."
+        Write-Output "Removed VBS launch script from Startup folder."
     }
+    
+    # 2. Remove Scheduled Task
+    if ($IsAdmin) {
+        if (Get-ScheduledTask -TaskPath "\" -TaskName $TaskName -ErrorAction SilentlyContinue) {
+            Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
+            Write-Output "Unregistered Scheduled Task '$TaskName'."
+        }
+    } else {
+        # If not admin, try to remove but ignore error if we can't
+        try {
+            if (Get-ScheduledTask -TaskPath "\" -TaskName $TaskName -ErrorAction SilentlyContinue) {
+                Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
+                Write-Output "Unregistered Scheduled Task '$TaskName'."
+            }
+        } catch {}
+    }
+    
     Stop-Daemon
     exit
 }
@@ -48,19 +74,51 @@ if (-not (Test-Path $ScriptPath)) {
     exit
 }
 
-# Stop any currently running instances before registering/restarting
+# Stop current instances
 Stop-Daemon
 
-Write-Output "Creating silent VBScript launcher in Startup folder..."
-$VbsContent = @"
+if ($IsAdmin) {
+    Write-Output "Admin rights detected. Registering via Windows Task Scheduler with HIGHEST privileges..."
+    
+    # Remove VBS startup script if it exists to avoid duplicates
+    if (Test-Path $VbsPath) {
+        Remove-Item $VbsPath -Force
+    }
+
+    # Action: Run powershell silently
+    $Action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$ScriptPath`""
+    $Trigger = New-ScheduledTaskTrigger -AtLogOn
+    
+    # Principal: Run with highest privileges (elevated) under current user account
+    $PrincipalObj = New-ScheduledTaskPrincipal -UserId $Identity.Name -RunLevel Highest
+    
+    $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+    $Settings.ExecutionTimeLimit = $null
+
+    Register-ScheduledTask -TaskName $TaskName -Trigger $Trigger -Action $Action -Settings $Settings -Principal $PrincipalObj -Force | Out-Null
+    Start-ScheduledTask -TaskName $TaskName | Out-Null
+
+    Write-Output "Successfully registered and started Scheduled Task '$TaskName' with Highest Privileges."
+} else {
+    Write-Output "User rights detected. Registering via Startup folder (VBScript)..."
+    
+    # Try to clean up Scheduled Task if it exists
+    try {
+        if (Get-ScheduledTask -TaskPath "\" -TaskName $TaskName -ErrorAction SilentlyContinue) {
+            Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false | Out-Null
+            Write-Output "Removed old Scheduled Task registration."
+        }
+    } catch {}
+
+    $VbsContent = @"
 Set WshShell = CreateObject("WScript.Shell")
 WshShell.Run "powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File ""$ScriptPath""", 0, false
 "@
 
-[System.IO.File]::WriteAllText($VbsPath, $VbsContent)
-Write-Output "Successfully registered autostart at: $VbsPath"
-
-# Run it immediately
-Write-Output "Starting Process Priority Saver in the background..."
-Start-Process wscript.exe -ArgumentList "`"$VbsPath`""
-Write-Output "Successfully started. It is now running silently in the background."
+    [System.IO.File]::WriteAllText($VbsPath, $VbsContent)
+    Write-Output "Successfully registered autostart at: $VbsPath"
+    
+    # Start it
+    Start-Process wscript.exe -ArgumentList "`"$VbsPath`""
+    Write-Output "Successfully started. Running silently in the background."
+}
